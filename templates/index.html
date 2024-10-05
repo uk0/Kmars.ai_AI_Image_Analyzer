@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Analyzer</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        #upload-form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #file-input {
+            display: none;
+        }
+        .file-label {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .file-label:hover {
+            background-color: #2980b9;
+        }
+        #submit-btn {
+            margin-top: 20px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #submit-btn:hover {
+            background-color: #27ae60;
+        }
+        #result {
+            margin-top: 30px;
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .result-section {
+            margin-bottom: 20px;
+        }
+        .result-section h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        #loading {
+            text-align: center;
+            display: none;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #file-name {
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .input-group {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #image-preview {
+            max-width: 300px;
+            max-height: 300px;
+            margin-top: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Image Analyzer</h1>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" id="file-input" name="file" accept="image/*" required>
+            <label for="file-input" class="file-label">Choose an image</label>
+            <div id="file-name"></div>
+            <img id="image-preview" src="" alt="Image preview">
+            <div class="input-group">
+                <label for="prompt-input">Custom Prompt:</label>
+                <input type="text" id="prompt-input" name="prompt" placeholder="What did you see?">
+            </div>
+            <button type="submit" id="submit-btn">Analyze Image</button>
+        </form>
+        <div id="loading">
+            <div class="spinner"></div>
+            <p>Analyzing image, please wait...</p>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#file-input').change(function(e) {
+                var fileName = $(this).val().split('\\').pop();
+                $('#file-name').text(fileName);
+
+                // 预览图片
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#image-preview').attr('src', e.target.result).show();
+                }
+                reader.readAsDataURL(this.files[0]);
+            });
+
+            $('#upload-form').on('submit', function(e) {
+                e.preventDefault();
+                var formData = new FormData(this);
+
+                $('#result').hide();
+                $('#loading').show();
+
+                $.ajax({
+                    url: '/process_image',
+                    type: 'POST',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function(response) {
+                        $('#loading').hide();
+                        $('#result').html(
+                            '<div class="result-section">' +
+                            '<h2>English Description:</h2>' +
+                            '<p>' + response.description + '</p>' +
+                            '</div>' +
+                            '<div class="result-section">' +
+                            '<h2>Chinese Translation:</h2>' +
+                            '<p>' + response.translation + '</p>' +
+                            '</div>'
+                        ).show();
+                    },
+                    error: function() {
+                        $('#loading').hide();
+                        $('#result').html('<p>An error occurred. Please try again.</p>').show();
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
