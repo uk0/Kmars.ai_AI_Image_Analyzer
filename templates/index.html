@@ -117,6 +117,30 @@
             box-shadow: 0 0 5px rgba(0,0,0,0.2);
             display: none;
         }
+
+
+        #history {
+            margin-top: 40px;
+        }
+        .history-item {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .history-item img {
+            max-width: 100px;
+            max-height: 100px;
+            margin-right: 15px;
+            float: left;
+        }
+        .history-item .content {
+            overflow: hidden;
+        }
+        .history-item h3 {
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
@@ -138,10 +162,41 @@
             <p>Analyzing image, please wait...</p>
         </div>
         <div id="result"></div>
+
+
+        <div id="history">
+            <h2>History</h2>
+            <div id="history-list"></div>
+        </div>
     </div>
 
     <script>
         $(document).ready(function() {
+
+                        function loadHistory() {
+                $.get('/get_history', function(data) {
+                    var historyHtml = '';
+                    data.reverse().forEach(function(item) {
+                        historyHtml += `
+                            <div class="history-item">
+                                <img src="/uploads/${item.filename}" alt="Uploaded image">
+                                <div class="content">
+                                    <h3>${item.filename}</h3>
+                                    <p><strong>Description:</strong> ${item.description}</p>
+                                    <p><strong>Translation:</strong> ${item.translation}</p>
+                                    <p><small>Time: ${new Date(item.timestamp).toLocaleString()}</small></p>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    $('#history-list').html(historyHtml);
+                });
+            }
+
+            loadHistory();
+
+
+
             $('#file-input').change(function(e) {
                 var fileName = $(this).val().split('\\').pop();
                 $('#file-name').text(fileName);
