@@ -7,162 +7,229 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f4f4f4;
+            --text-color: #333;
+            --border-color: #ddd;
+        }
+
         body {
             font-family: 'Roboto', sans-serif;
             line-height: 1.6;
-            color: #333;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f4f4f4;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 0;
         }
+
         .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .card {
             background-color: #fff;
             border-radius: 8px;
             padding: 30px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
         }
-        h1 {
-            color: #2c3e50;
-            text-align: center;
-            margin-bottom: 30px;
-        }
+
         #upload-form {
             display: flex;
             flex-direction: column;
             align-items: center;
         }
+
+        .input-group {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .input-group input[type="text"],
+        .input-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .input-group select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23333' viewBox='0 0 12 12'%3E%3Cpath d='M10.293 3.293 6 7.586 1.707 3.293A1 1 0 0 0 .293 4.707l5 5a1 1 0 0 0 1.414 0l5-5a1 1 0 1 0-1.414-1.414z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+
         #file-input {
             display: none;
         }
+
         .file-label {
-            background-color: #3498db;
+            background-color: var(--primary-color);
             color: white;
             padding: 10px 20px;
             border-radius: 5px;
             cursor: pointer;
             transition: background-color 0.3s ease;
+            font-size: 16px;
         }
+
         .file-label:hover {
             background-color: #2980b9;
         }
+
         #submit-btn {
-            margin-top: 20px;
-            background-color: #2ecc71;
+            background-color: var(--secondary-color);
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 5px;
             cursor: pointer;
             transition: background-color 0.3s ease;
+            font-size: 18px;
+            margin-top: 20px;
         }
+
         #submit-btn:hover {
             background-color: #27ae60;
         }
-        #result {
-            margin-top: 30px;
-            background-color: #ecf0f1;
-            padding: 20px;
+
+        #image-preview {
+            max-width: 300px;
+            max-height: 300px;
+            margin: 20px 0;
             border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
         }
-        .result-section {
-            margin-bottom: 20px;
-        }
-        .result-section h2 {
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 5px;
-        }
+
         #loading {
             text-align: center;
             display: none;
         }
+
         .spinner {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
+            border-top: 4px solid var(--primary-color);
             border-radius: 50%;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
             margin: 20px auto;
         }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        #file-name {
-            margin-top: 10px;
-            font-style: italic;
-        }
-        .input-group {
-            margin-top: 20px;
-            width: 100%;
-            max-width: 400px;
-        }
-        .input-group label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        .input-group input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        #image-preview {
-            max-width: 300px;
-            max-height: 300px;
-            margin-top: 20px;
+
+        #result {
+            background-color: #ecf0f1;
+            padding: 20px;
             border-radius: 5px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.2);
-            display: none;
+            margin-top: 20px;
         }
 
+        .result-section {
+            margin-bottom: 20px;
+        }
+
+        .result-section h2 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 5px;
+        }
 
         #history {
             margin-top: 40px;
         }
+
         .history-item {
-            background-color: #f9f9f9;
-            border: 1px solid #ddd;
+            background-color: #fff;
+            border: 1px solid var(--border-color);
             border-radius: 5px;
             padding: 15px;
             margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
         }
+
         .history-item img {
             max-width: 100px;
             max-height: 100px;
             margin-right: 15px;
-            float: left;
+            border-radius: 5px;
         }
+
         .history-item .content {
-            overflow: hidden;
+            flex: 1;
         }
+
         .history-item h3 {
             margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .history-item p {
+            margin: 5px 0;
+        }
+
+        .history-item small {
+            color: #777;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>AI Image Analyzer</h1>
-        <form id="upload-form" enctype="multipart/form-data">
-            <input type="file" id="file-input" name="file" accept="image/*" required>
-            <label for="file-input" class="file-label">Choose an image</label>
-            <div id="file-name"></div>
-            <img id="image-preview" src="" alt="Image preview">
-            <div class="input-group">
-                <label for="prompt-input">Custom Prompt:</label>
-                <input type="text" id="prompt-input" name="prompt" placeholder="What did you see?">
-            </div>
-            <button type="submit" id="submit-btn">Analyze Image</button>
-        </form>
+        <div class="card">
+            <form id="upload-form" enctype="multipart/form-data">
+                <div class="input-group">
+                    <label for="file-input" class="file-label">Choose an image</label>
+                    <input type="file" id="file-input" name="file" accept="image/*" required>
+                </div>
+                <div id="file-name"></div>
+                <img id="image-preview" src="" alt="Image preview">
+                <div class="input-group">
+                    <label for="prompt-input">Custom Prompt:</label>
+                    <input type="text" id="prompt-input" name="prompt" placeholder="Describe this image.">
+                </div>
+                <div class="input-group">
+                    <label for="model-select">Select Model:</label>
+                    <select id="model-select" name="model">
+                        <option value="meta-llama">Meta Vision Llama3.2 (no nsfw)</option>
+                        <option value="mistral_rs">Local OpenAPI  (no nsfw)</option>
+                        <option value="Molo">Molo Python  (nsfw)</option>
+                        <option value="minicpm">MiniCPM v2.6 </option>
+                    </select>
+                </div>
+                <button type="submit" id="submit-btn">Analyze Image</button>
+            </form>
+        </div>
         <div id="loading">
             <div class="spinner"></div>
             <p>Analyzing image, please wait...</p>
         </div>
         <div id="result"></div>
-
 
         <div id="history">
             <h2>History</h2>
@@ -173,15 +240,29 @@
     <script>
         $(document).ready(function() {
 
-                        function loadHistory() {
+           function truncateFilename(filename, maxLength = 32) {
+                if (filename.length <= maxLength) {
+                    return filename;
+                }
+                const extension = filename.split('.').pop();
+                const nameWithoutExtension = filename.substring(0, filename.length - extension.length - 1);
+                const truncatedName = nameWithoutExtension.substring(0, maxLength - 3 - extension.length) + '...';
+                return truncatedName + '.' + extension;
+            }
+
+
+            function loadHistory() {
                 $.get('/get_history', function(data) {
                     var historyHtml = '';
                     data.reverse().forEach(function(item) {
+                        const truncatedFilename = truncateFilename(item.filename);
+
                         historyHtml += `
                             <div class="history-item">
                                 <img src="/uploads/${item.filename}" alt="Uploaded image">
                                 <div class="content">
-                                    <h3>${item.filename}</h3>
+                                    <h3 title="${item.filename}">${truncatedFilename}</h3>
+                                    <p><strong>Model:</strong> ${item.model_type}</p>
                                     <p><strong>Description:</strong> ${item.description}</p>
                                     <p><strong>Translation:</strong> ${item.translation}</p>
                                     <p><small>Time: ${new Date(item.timestamp).toLocaleString()}</small></p>
@@ -195,13 +276,10 @@
 
             loadHistory();
 
-
-
             $('#file-input').change(function(e) {
                 var fileName = $(this).val().split('\\').pop();
                 $('#file-name').text(fileName);
 
-                // 预览图片
                 var reader = new FileReader();
                 reader.onload = function(e) {
                     $('#image-preview').attr('src', e.target.result).show();
@@ -226,6 +304,7 @@
                         $('#loading').hide();
                         $('#result').html(
                             '<div class="result-section">' +
+                            '<h2>Model: ' + response.model_type + '</h2>' +
                             '<h2>English Description:</h2>' +
                             '<p>' + response.description + '</p>' +
                             '</div>' +
@@ -234,6 +313,7 @@
                             '<p>' + response.translation + '</p>' +
                             '</div>'
                         ).show();
+                        loadHistory();
                     },
                     error: function() {
                         $('#loading').hide();
