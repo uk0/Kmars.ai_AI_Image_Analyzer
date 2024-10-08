@@ -302,6 +302,56 @@
             display: block;
         }
 
+         #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
+          #screenshots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .screenshot {
+            width: calc(33.333% - 20px);
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .screenshot img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .screenshot p {
+            padding: 10px;
+            margin: 0;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-color);
+            background-color: #f8f9fa;
+            border-top: 1px solid var(--border-color);
+        }
+
+        @media (max-width: 768px) {
+            .screenshot {
+                width: calc(50% - 20px);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .screenshot {
+                width: 100%;
+            }
+        }
+
 
     </style>
 </head>
@@ -333,19 +383,29 @@
             </form>
         </div>
 
-        <div id="camera-controls">
-            <button id="start-camera" class="btn btn-primary">Start Camera</button>
-            <button id="capture-button" class="btn btn-primary">One Capture </button>
-            <button id="stop-camera" class="btn btn-primary" style="display: none;">Stop Camera</button>
-            <input type="number" id="interval-input" min="20" value="25">
-            <button id="start-interval" class="btn btn-secondary">Start Interval Capture</button>
-            <button id="stop-interval" class="btn btn-secondary" style="display: none;">Stop Interval Capture</button>
+       <h1>Screen Capture Analyzer</h1>
+        <div class="card">
+            <button id="startCapture" class="btn btn-primary">Start Capture</button>
+            <button id="stopCapture" class="btn btn-secondary">Stop Capture</button>
+            <div id="status"></div>
         </div>
+
+       <h1>Camera Capture Analyzer</h1>
+        <div class="card">
+            <div id="camera-controls">
+                <button id="start-camera" class="btn btn-primary">Start Camera</button>
+                <button id="capture-button" class="btn btn-primary">One Capture </button>
+                <button id="stop-camera" class="btn btn-primary" style="display: none;">Stop Camera</button>
+                <input type="number" id="interval-input" min="20" value="25">
+                <button id="start-interval" class="btn btn-secondary">Start Interval Capture</button>
+                <button id="stop-interval" class="btn btn-secondary" style="display: none;">Stop Interval Capture</button>
+            </div>
+
         <div id="camera-preview-container">
             <video id="camera-preview" autoplay playsinline></video>
         </div>
         <canvas id="canvas" style="display:none;"></canvas>
-
+      </div>
 
         <div id="loading">
             <div class="spinner"></div>
@@ -362,7 +422,19 @@
     <script>
         $(document).ready(function() {
 
-             let stream;
+             $('#startCapture').click(function() {
+                $.post('/start_capture', function(data) {
+                    $('#status').text(data.message);
+                });
+            });
+
+            $('#stopCapture').click(function() {
+                $.post('/stop_capture', function(data) {
+                    $('#status').text(data.message);
+                });
+            });
+
+            let stream;
             let intervalId;
             const video = document.getElementById('camera-preview');
             const canvas = document.getElementById('canvas');
@@ -386,6 +458,7 @@
                 $('#camera-preview').hide();
                 $('#stop-camera').hide();
                 $('#start-camera').show();
+
             }
 
             function captureImage() {

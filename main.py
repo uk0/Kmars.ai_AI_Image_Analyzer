@@ -1,9 +1,11 @@
 import base64
 import io
 import json
+import threading
 import time
 from datetime import datetime
 
+import pyautogui
 from flask import Flask, request, render_template, jsonify, send_from_directory
 from openai import OpenAI
 from werkzeug.utils import secure_filename
@@ -14,6 +16,11 @@ from PIL import Image
 import torch
 
 app = Flask(__name__)
+
+screenshot_thread = None
+screenshot_interval = 30
+is_capturing = False
+
 
 
 HISTORY_FILE = 'history.json'
@@ -33,6 +40,23 @@ molo_model = AutoModelForCausalLM.from_pretrained(hf_model, trust_remote_code=Tr
                                              device_map='cpu')
 
 translator = pipeline(model='Helsinki-NLP/opus-mt-en-zh', device_map="cpu")
+
+
+
+def capture_screen():
+    global is_capturing
+    while is_capturing:
+
+        screenshot = pyautogui.screenshot()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"screenshot_{timestamp}.png"
+        screenshot.save(f"{UPLOAD_FOLDER}/{filename}")
+        model_type = "minicpm"
+        prompt = "你看到了什么详细说一下"
+        print(f"capture_screen running {UPLOAD_FOLDER}/{filename}")
+        generated_text, translated_text, generation_time = _process_image(f"{UPLOAD_FOLDER}/{filename}", prompt, model_type)
+        save_history(filename, generated_text, translated_text, model_type, generation_time)
+        time.sleep(screenshot_interval)
 
 
 def save_history(filename, description, translation, model_type,generation_time):
@@ -165,24 +189,25 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/process_image', methods=['POST'])
-def process_image():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'})
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'})
+@app.route('/start_capture', methods=['POST'])
+def start_capture():
+    global screenshot_thread, is_capturing
+    if not is_capturing:
+        is_capturing = True
+        screenshot_thread = threading.Thread(target=capture_screen)
+        screenshot_thread.start()
+        return jsonify({"status": "success", "message": "Screen capture started"})
+    return jsonify({"status": "error", "message": "Screen capture already running"})
 
-    # 获取描述提示，如果未提供则使用默认值
-    prompt = request.form.get('prompt', 'What did you see?')
-    model_type = request.form.get('model', 'meta_vision_llama')
+@app.route('/stop_capture', methods=['POST'])
+def stop_capture():
+    global is_capturing,screenshot_thread
+    if is_capturing:
+        is_capturing = False
+        return jsonify({"status": "success", "message": "Screen capture stopped"})
+    return jsonify({"status": "error", "message": "Screen capture not running"})
 
-
-    if file:
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-
+def _process_image(filepath, prompt,model_type):
         start_time = time.time()
         if model_type == 'Molo':
             generated_text,translated_text = process_image_molmo(filepath, prompt)
@@ -196,6 +221,27 @@ def process_image():
             return jsonify({'error': 'Invalid model type'})
         end_time = time.time()
         generation_time = end_time - start_time
+
+        return generated_text, translated_text,generation_time
+
+@app.route('/process_image', methods=['POST'])
+def process_image():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'})
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'})
+
+    # 获取描述提示，如果未提供则使用默认值
+    prompt = request.form.get('prompt', 'What did you see?')
+    model_type = request.form.get('model', 'meta_vision_llama')
+    if file:
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+
+        generated_text, translated_text,generation_time =  _process_image(filepath, prompt,model_type)
+
         save_history(filename, generated_text, translated_text,model_type,generation_time)
 
         return jsonify({
@@ -204,7 +250,6 @@ def process_image():
             'filename': filename,
             'model_type': model_type,
             'generation_time': generation_time
-
         })
 
 
