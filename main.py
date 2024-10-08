@@ -20,6 +20,7 @@ import torch
 is_tf  = {
     "llava-llama3":True,
     "allenai/Molmo-7B-D-0924":True,
+    "chatgph/gph-main":True,
     "llava:7b-v1.6-vicuna-fp16":True,
     "llava:13b-v1.6-vicuna-q8_0":True,
     "unsloth/Llama-3.2-11B-Vision-Instruct":True,
@@ -52,6 +53,58 @@ molo_model = AutoModelForCausalLM.from_pretrained(hf_model, trust_remote_code=Tr
 
 translator = pipeline(model='Helsinki-NLP/opus-mt-en-zh', device_map="cpu")
 
+
+
+import xml.etree.ElementTree as ET
+import re
+from typing import List, Dict
+
+
+def parse_points(description: str) -> List[Dict[str, any]]:
+    """
+    解析描述中的point和points标签，提取所有坐标对和其他信息。
+
+    :param description: 包含point或points标签的描述字符串
+    :return: 包含解析后信息的字典列表
+    """
+    xml_string = f"<root>{description}</root>"
+
+    try:
+        root = ET.fromstring(xml_string)
+    except ET.ParseError:
+        return []
+
+    points_data = []
+
+    for point in root.findall('.//point') + root.findall('.//points'):
+        point_info = {
+            'coordinates': [],
+            'alt': point.get('alt', ''),
+            'text': point.text.strip() if point.text else ''
+        }
+
+        attrs = point.attrib
+        coord_pairs = []
+
+        # 首先检查是否有 x 和 y 属性
+        if 'x' in attrs and 'y' in attrs:
+            coord_pairs.append((float(attrs['x']), float(attrs['y'])))
+
+        # 然后检查是否有 x1, y1, x2, y2 等格式
+        i = 1
+        while f'x{i}' in attrs and f'y{i}' in attrs:
+            coord_pairs.append((float(attrs[f'x{i}']), float(attrs[f'y{i}'])))
+            i += 1
+
+        # 如果仍然没有找到坐标，尝试解析属性值中的所有数字对
+        if not coord_pairs:
+            all_values = ' '.join(attrs.values())
+            coord_pairs = [(float(x), float(y)) for x, y in re.findall(r'(\d+\.?\d*)\s+(\d+\.?\d*)', all_values)]
+
+        point_info['coordinates'] = coord_pairs
+        points_data.append(point_info)
+
+    return points_data
 
 
 def contains_chinese(text):
@@ -94,7 +147,7 @@ def capture_screen():
         time.sleep(screenshot_interval)
 
 
-def save_history(filename, description, translation, model_type,generation_time):
+def save_history(filename, description, translation, model_type,generation_time,question):
     history = []
     if os.path.exists(f"{UPLOAD_FOLDER}/{HISTORY_FILE}"):
         with open(f"{UPLOAD_FOLDER}/{HISTORY_FILE}", 'r') as f:
@@ -106,7 +159,8 @@ def save_history(filename, description, translation, model_type,generation_time)
         'translation': translation,
         'model_type': model_type,
         'timestamp': datetime.now().isoformat(),
-        'generation_time': generation_time
+        'generation_time': generation_time,
+        'question': question
     })
 
     with open(f"{UPLOAD_FOLDER}/{HISTORY_FILE}", 'w') as f:
@@ -125,10 +179,13 @@ def process_image_molmo(filepath, prompt):
         GenerationConfig(max_new_tokens=512, stop_strings="<|endoftext|>"),
         tokenizer=molo_processor.tokenizer
     )
-
     generated_tokens = output[0, inputs['input_ids'].size(1):]
     generated_text = molo_processor.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
+    result_point = parse_points(generated_tokens)
+
+    print("find points:", result_point)
+    print(result_point)
     return result_translated_text(generated_text)
 
 
@@ -179,6 +236,7 @@ def process_minicpm(filepath, prompt):
     res = ollama.chat(
         model="minicpm-v:8b-2.6-q8_0",
         # model="llava:13b-v1.6-vicuna-q8_0",
+        options={"temperature": 0.2},
         messages=[
             {
                 'role': 'user',
@@ -254,7 +312,6 @@ def _process_image(filepath, prompt,model_type):
             return jsonify({'error': 'Invalid model type'})
         end_time = time.time()
         generation_time = end_time - start_time
-
         return generated_text, translated_text,generation_time
 
 @app.route('/process_image', methods=['POST'])
@@ -266,7 +323,7 @@ def process_image():
         return jsonify({'error': 'No selected file'})
 
     # 获取描述提示，如果未提供则使用默认值
-    prompt = request.form.get('prompt', 'What did you see?')
+    prompt = request.form.get('prompt', 'What did you see? Please tell me in detail, it is very important to me.')
     model_type = request.form.get('model', 'meta_vision_llama')
     if file:
         filename = secure_filename(file.filename)
@@ -275,14 +332,15 @@ def process_image():
 
         generated_text, translated_text,generation_time =  _process_image(filepath, prompt,model_type)
 
-        save_history(filename, generated_text, translated_text,model_type,generation_time)
+        save_history(filename, generated_text, translated_text,model_type,generation_time, prompt)
 
         return jsonify({
             'description': generated_text,
             'translation': translated_text,
             'filename': filename,
             'model_type': model_type,
-            'generation_time': generation_time
+            'generation_time': generation_time,
+            'question': prompt
         })
 
 

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Image Analyzer</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -60,7 +62,7 @@
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
-            color: var(--primary-color);
+            color: #040404;
         }
 
         .input-group input[type="text"],
@@ -86,11 +88,12 @@
         .file-label {
             background-color: var(--primary-color);
             color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 14px 40%;
+            border-radius: 8px;
             cursor: pointer;
             transition: background-color 0.3s ease;
             font-size: 16px;
+            width: 100%;
         }
 
         .file-label:hover {
@@ -198,7 +201,7 @@
         }
 
          :root {
-            --primary-color: #3498db;
+            --primary-color: #6ca5e6;
             --secondary-color: #2ecc71;
             --background-color: #f4f4f4;
             --text-color: #333;
@@ -352,6 +355,75 @@
             }
         }
 
+        .modal-body img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .history-item {
+            cursor: pointer;
+            transition: background-color 0.4s ease;
+        }
+
+        .history-item:hover {
+            background-color: #f0f0f0;
+        }
+
+
+    @keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.9;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.3);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.9;
+    }
+}
+
+.point {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    z-index: 1000;
+    animation: pulse 2s infinite ease-in-out;
+    background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,0,0,1) 50%, rgba(255,0,0,0.5) 100%);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+.tooltip {
+    visibility: hidden;
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    text-align: center;
+    padding: 5px 10px;
+    border-radius: 6px;
+    z-index: 1001;
+    width: auto;
+    white-space: nowrap;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.point:hover {
+    animation-play-state: paused;
+}
+
+.point:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
 
     </style>
 </head>
@@ -368,15 +440,15 @@
                 <img id="image-preview" src="" alt="Image preview">
                 <div class="input-group">
                     <label for="prompt-input">Custom Prompt:</label>
-                    <input type="text" id="prompt-input" name="prompt" placeholder="Describe this image.">
+                    <input type="text" id="prompt-input" name="prompt" placeholder="What did you see? Please tell me in detail, it is very important to me.">
                 </div>
                 <div class="input-group">
                     <label for="model-select">Select Model:</label>
                     <select id="model-select" name="model">
-                        <option value="meta-llama">Meta Vision Llama3.2 (no nsfw)</option>
-                        <option value="mistral_rs">Local OpenAPI  (no nsfw)</option>
-                        <option value="Molo">Molo Python  (nsfw)</option>
-                        <option value="minicpm">MiniCPM v2.6 </option>
+                         <option value="minicpm">MiniCPM v2.6 </option>
+                         <option value="Molo">Molo Python  (nsfw)</option>
+                         <option value="meta-llama">Meta Vision Llama3.2 (no nsfw)</option>
+                         <option value="mistral_rs">Local OpenAPI  (no nsfw)</option>
                     </select>
                 </div>
                 <button type="submit" id="submit-btn">Analyze Image</button>
@@ -419,8 +491,123 @@
         </div>
     </div>
 
+
+   <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel">Image Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+{#                    <img src="" id="modalImage" alt="Full size image" style="max-width: 100%; height: auto;">#}
+                <div id="imageDetails"></div>
+            </div>
+        </div>
+    </div>
+   </div>
+
     <script>
         $(document).ready(function() {
+
+            function parsePoints(description) {
+                // 创建一个临时的 DOM 元素来解析 XML
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(`<root>${description}</root>`, "text/xml");
+
+                if (!xmlDoc || xmlDoc.getElementsByTagName("parsererror").length > 0) {
+                    return [];
+                }
+
+                const pointsData = [];
+
+                // 选择所有的 point 和 points 元素
+                const pointElements = [...xmlDoc.getElementsByTagName('point'), ...xmlDoc.getElementsByTagName('points')];
+
+                pointElements.forEach(point => {
+                    const pointInfo = {
+                        coordinates: [],
+                        alt: point.getAttribute('alt') || '',
+                        text: point.textContent.trim()
+                    };
+
+                    const attrs = point.attributes;
+                    let coordPairs = [];
+
+                    // 首先检查是否有 x 和 y 属性
+                    if (attrs.x && attrs.y) {
+                        coordPairs.push([parseFloat(attrs.x.value), parseFloat(attrs.y.value)]);
+                    }
+
+                    // 然后检查是否有 x1, y1, x2, y2 等格式
+                    let i = 1;
+                    while (attrs[`x${i}`] && attrs[`y${i}`]) {
+                        coordPairs.push([parseFloat(attrs[`x${i}`].value), parseFloat(attrs[`y${i}`].value)]);
+                        i++;
+                    }
+
+                    // 如果仍然没有找到坐标，尝试解析属性值中的所有数字对
+                    if (coordPairs.length === 0) {
+                        const allValues = Array.from(attrs).map(attr => attr.value).join(' ');
+                        const matches = allValues.match(/(\d+\.?\d*)\s+(\d+\.?\d*)/g) || [];
+                        coordPairs = matches.map(pair => pair.split(' ').map(parseFloat));
+                    }
+
+                    pointInfo.coordinates = coordPairs;
+                    pointsData.push(pointInfo);
+                });
+                console.log("==========================================")
+                console.log(pointsData)
+                return pointsData;
+            }
+
+
+   function drawPointsOnImage(imageUrl, pointsData) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+            const container = document.createElement('div');
+            container.id = 'imageContainer';  // 添加这行
+            container.style.position = 'relative';
+            container.style.display = 'inline-block';
+            container.style.maxWidth = '100%';
+
+            const imgElement = document.createElement('img');
+            imgElement.src = imageUrl;
+            imgElement.style.display = 'block';
+            imgElement.style.maxWidth = '100%';
+            imgElement.style.height = 'auto';
+            container.appendChild(imgElement);
+
+            pointsData.forEach((point, index) => {
+                point.coordinates.forEach(([x, y]) => {
+                    const pointElement = document.createElement('div');
+                    pointElement.className = 'point';
+                    pointElement.style.left = `${x}%`;
+                    pointElement.style.top = `${y}%`;
+                    pointElement.style.backgroundColor = getColor(index);
+
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'tooltip';
+                    tooltip.textContent = point.alt || point.text;
+                    pointElement.appendChild(tooltip);
+
+                    container.appendChild(pointElement);
+                });
+            });
+
+            resolve(container);
+        };
+        img.onerror = reject;
+        img.src = imageUrl;
+    });
+}
+
+            function getColor(index) {
+                const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'];
+                return colors[index % colors.length];
+            }
+
 
              $('#startCapture').click(function() {
                 $.post('/start_capture', function(data) {
@@ -487,16 +674,24 @@
                         const truncatedFilename = truncateFilename(item.filename);
                         const generationTime = item.generation_time ? `${item.generation_time.toFixed(2)} seconds` : 'N/A';
                         historyHtml += `
-                            <div class="history-item">
+                            <div class="history-item" data-bs-toggle="modal" data-bs-target="#imageModal"
+                                 data-image="/uploads/${item.filename}"
+                                 data-filename="${item.filename}"
+                                 data-description='${item.description}'
+                                 data-translation='${item.translation}'
+                                 data-model="${item.model_type}"
+                                 data-time="${new Date(item.timestamp).toLocaleString()}"
+                                 data-question="${item.question}"
+                                 data-generation-time="${generationTime}">
                                 <img src="/uploads/${item.filename}" alt="Uploaded image">
                                 <div class="content">
                                     <h3 title="${item.filename}">${truncatedFilename}</h3>
                                     <p><strong>Model:</strong> ${item.model_type}</p>
                                     <p><strong>Description:</strong> ${item.description}</p>
                                     <p><strong>Translation:</strong> ${item.translation}</p>
+                                    <p><strong>Question:</strong> ${item.question}</p>
                                     <p><small>Time: ${new Date(item.timestamp).toLocaleString()}</small></p>
-                                    <p><small>Generation Time: ${generationTime}</small><p>
-
+                                    <p><small>Generation Time: ${generationTime}</small></p>
                                 </div>
                             </div>
                         `;
@@ -505,7 +700,49 @@
                 });
             }
 
+
+            setInterval(loadHistory, 5000); // 每5秒更新一次截图列表
+
             loadHistory();
+
+            // 处理模态框图片点击事件
+         $(document).on('click', '.history-item', function() {
+    var imageUrl = $(this).data('image');
+    var filename = $(this).data('filename');
+    var description = $(this).data('description') || 'N/A';
+    var translation = $(this).data('translation') || 'N/A';
+    var model = $(this).data('model') || 'N/A';
+    var question = $(this).data('question') || 'N/A';
+    var time = $(this).data('time') || 'N/A';
+    var generationTime = $(this).data('generation-time') || 'N/A';
+
+    $('#imageModalLabel').text(filename);
+    $('#imageDetails').html(`
+        <p><strong>Description:</strong> ${description}</p>
+        <p><strong>Translation:</strong> ${translation}</p>
+        <p><strong>Question:</strong> ${question}</p>
+        <p><strong>Model:</strong> ${model}</p>
+        <p><strong>Time:</strong> ${time}</p>
+        <p><strong>Generation Time:</strong> ${generationTime}</p>
+    `);
+
+    const points = parsePoints(description);
+    if (points.length > 0) {
+        drawPointsOnImage(imageUrl, points).then(container => {
+            // 替换整个容器，而不是只替换图片
+            $('#imageContainer').remove();  // 移除旧的容器
+            $('.modal-body').prepend(container);  // 添加新的容器
+        }).catch(error => {
+            console.error('Error drawing points on image:', error);
+            $('#modalImage').attr('src', imageUrl);
+        });
+    } else {
+        // 如果没有点，就显示普通的图片
+        $('#imageContainer').remove();  // 移除旧的容器（如果有的话）
+        $('.modal-body').prepend(`<img id="modalImage" src="${imageUrl}" alt="Full size image" style="max-width: 100%; height: auto;">`);
+    }
+});
+
 
             $('#file-input').change(function(e) {
                 var fileName = $(this).val().split('\\').pop();
