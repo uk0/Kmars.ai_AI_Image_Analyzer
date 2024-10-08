@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import re
 import threading
 import time
 from datetime import datetime
@@ -14,6 +15,16 @@ from transformers import AutoModelForCausalLM, AutoProcessor, GenerationConfig, 
     MllamaForConditionalGeneration, AutoModel, AutoTokenizer
 from PIL import Image
 import torch
+
+
+is_tf  = {
+    "llava-llama3":True,
+    "allenai/Molmo-7B-D-0924":True,
+    "llava:7b-v1.6-vicuna-fp16":True,
+    "llava:13b-v1.6-vicuna-q8_0":True,
+    "unsloth/Llama-3.2-11B-Vision-Instruct":True,
+    "minicpm-v:8b-2.6-q8_0":False,
+}
 
 app = Flask(__name__)
 
@@ -43,6 +54,30 @@ translator = pipeline(model='Helsinki-NLP/opus-mt-en-zh', device_map="cpu")
 
 
 
+def contains_chinese(text):
+    """
+    检查给定的文本是否包含中文字符。
+
+    :param text: 要检查的字符串
+    :return: 如果包含中文字符则返回 True，否则返回 False
+    """
+    # 匹配中文字符的正则表达式
+    pattern = re.compile(r'[\u4e00-\u9fff]+')
+
+    # 如果找到匹配项，则字符串包含中文
+    if pattern.search(text):
+        return True
+    else:
+        return False
+
+
+def result_translated_text(text):
+    if contains_chinese(text):
+        return text,text
+    else:
+        return text,translator(text)[0].get("translation_text")
+
+
 def capture_screen():
     global is_capturing
     while is_capturing:
@@ -52,7 +87,7 @@ def capture_screen():
         filename = f"screenshot_{timestamp}.png"
         screenshot.save(f"{UPLOAD_FOLDER}/{filename}")
         model_type = "minicpm"
-        prompt = "你看到了什么详细说一下"
+        prompt = "Detailed description of what you saw. Please describe the scene you saw and the storage of various items in the scene. Please learn more about the alternate description. :"
         print(f"capture_screen running {UPLOAD_FOLDER}/{filename}")
         generated_text, translated_text, generation_time = _process_image(f"{UPLOAD_FOLDER}/{filename}", prompt, model_type)
         save_history(filename, generated_text, translated_text, model_type, generation_time)
@@ -94,9 +129,7 @@ def process_image_molmo(filepath, prompt):
     generated_tokens = output[0, inputs['input_ids'].size(1):]
     generated_text = molo_processor.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
-    translated_text = translator(generated_text)[0].get("translation_text")
-
-    return generated_text, translated_text
+    return result_translated_text(generated_text)
 
 
 
@@ -138,14 +171,14 @@ def process_mistral_rs(filepath, prompt):
         temperature=0,
     )
     resp = completion.choices[0].message.content
-    translated_text = translator(resp)[0].get("translation_text")
-    return resp, translated_text
+    return result_translated_text(resp)
 
 
 def process_minicpm(filepath, prompt):
     import ollama
     res = ollama.chat(
         model="minicpm-v:8b-2.6-q8_0",
+        # model="llava:13b-v1.6-vicuna-q8_0",
         messages=[
             {
                 'role': 'user',
@@ -154,7 +187,7 @@ def process_minicpm(filepath, prompt):
             }
         ]
     )
-    return res['message']['content'], res['message']['content']
+    return result_translated_text(res['message']['content'])
 
 
 def process_meta_llama(filepath, prompt):
@@ -180,8 +213,8 @@ def process_meta_llama(filepath, prompt):
         return_tensors="pt"
     ).to(model.device)
     output = model.generate(**inputs, max_new_tokens=512)
-    translated_text = translator(processor.decode(output[0]))[0].get("translation_text")
-    return processor.decode(output[0]), translated_text
+
+    return result_translated_text(processor.decode(output[0]))
 
 
 @app.route('/', methods=['GET'])
