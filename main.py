@@ -1,5 +1,7 @@
 import base64
+import io
 import json
+import time
 from datetime import datetime
 
 from flask import Flask, request, render_template, jsonify, send_from_directory
@@ -33,7 +35,7 @@ molo_model = AutoModelForCausalLM.from_pretrained(hf_model, trust_remote_code=Tr
 translator = pipeline(model='Helsinki-NLP/opus-mt-en-zh', device_map="cpu")
 
 
-def save_history(filename, description, translation, model_type):
+def save_history(filename, description, translation, model_type,generation_time):
     history = []
     if os.path.exists(f"{UPLOAD_FOLDER}/{HISTORY_FILE}"):
         with open(f"{UPLOAD_FOLDER}/{HISTORY_FILE}", 'r') as f:
@@ -44,7 +46,8 @@ def save_history(filename, description, translation, model_type):
         'description': description,
         'translation': translation,
         'model_type': model_type,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+        'generation_time': generation_time
     })
 
     with open(f"{UPLOAD_FOLDER}/{HISTORY_FILE}", 'w') as f:
@@ -180,6 +183,7 @@ def process_image():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
+        start_time = time.time()
         if model_type == 'Molo':
             generated_text,translated_text = process_image_molmo(filepath, prompt)
         elif model_type == 'mistral_rs':
@@ -190,14 +194,17 @@ def process_image():
             generated_text,translated_text = process_meta_llama(filepath, prompt)
         else:
             return jsonify({'error': 'Invalid model type'})
-
-        save_history(filename, generated_text, translated_text,model_type)
+        end_time = time.time()
+        generation_time = end_time - start_time
+        save_history(filename, generated_text, translated_text,model_type,generation_time)
 
         return jsonify({
             'description': generated_text,
             'translation': translated_text,
             'filename': filename,
-            'model_type': model_type
+            'model_type': model_type,
+            'generation_time': generation_time
+
         })
 
 

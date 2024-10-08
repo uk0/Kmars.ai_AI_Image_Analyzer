@@ -196,6 +196,113 @@
         .history-item small {
             color: #777;
         }
+
+         :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f4f4f4;
+            --text-color: #333;
+            --border-color: #ddd;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        /* Button styles */
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+            margin: 5px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #27ae60;
+        }
+
+        /* Camera controls */
+        #camera-controls {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        #interval-input {
+            width: 60px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+
+        /* Video preview */
+        #camera-preview-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 20px auto;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #camera-preview {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+
     </style>
 </head>
 <body>
@@ -225,6 +332,21 @@
                 <button type="submit" id="submit-btn">Analyze Image</button>
             </form>
         </div>
+
+        <div id="camera-controls">
+            <button id="start-camera" class="btn btn-primary">Start Camera</button>
+            <button id="capture-button" class="btn btn-primary">One Capture </button>
+            <button id="stop-camera" class="btn btn-primary" style="display: none;">Stop Camera</button>
+            <input type="number" id="interval-input" min="20" value="25">
+            <button id="start-interval" class="btn btn-secondary">Start Interval Capture</button>
+            <button id="stop-interval" class="btn btn-secondary" style="display: none;">Stop Interval Capture</button>
+        </div>
+        <div id="camera-preview-container">
+            <video id="camera-preview" autoplay playsinline></video>
+        </div>
+        <canvas id="canvas" style="display:none;"></canvas>
+
+
         <div id="loading">
             <div class="spinner"></div>
             <p>Analyzing image, please wait...</p>
@@ -239,6 +361,40 @@
 
     <script>
         $(document).ready(function() {
+
+             let stream;
+            let intervalId;
+            const video = document.getElementById('camera-preview');
+            const canvas = document.getElementById('canvas');
+
+            function startCamera() {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(function(s) {
+                        stream = s;
+                        video.srcObject = stream;
+                        $('#camera-preview').show();
+                        $('#start-camera').hide();
+                        $('#stop-camera').show();
+                    })
+                    .catch(function(err) {
+                        console.log("An error occurred: " + err);
+                    });
+            }
+
+            function stopCamera() {
+                stream.getTracks().forEach(track => track.stop());
+                $('#camera-preview').hide();
+                $('#stop-camera').hide();
+                $('#start-camera').show();
+            }
+
+            function captureImage() {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                return canvas.toDataURL('image/jpeg');
+            }
+
 
            function truncateFilename(filename, maxLength = 32) {
                 if (filename.length <= maxLength) {
@@ -256,7 +412,7 @@
                     var historyHtml = '';
                     data.reverse().forEach(function(item) {
                         const truncatedFilename = truncateFilename(item.filename);
-
+                        const generationTime = item.generation_time ? `${item.generation_time.toFixed(2)} seconds` : 'N/A';
                         historyHtml += `
                             <div class="history-item">
                                 <img src="/uploads/${item.filename}" alt="Uploaded image">
@@ -266,6 +422,8 @@
                                     <p><strong>Description:</strong> ${item.description}</p>
                                     <p><strong>Translation:</strong> ${item.translation}</p>
                                     <p><small>Time: ${new Date(item.timestamp).toLocaleString()}</small></p>
+                                    <p><small>Generation Time: ${generationTime}</small><p>
+
                                 </div>
                             </div>
                         `;
@@ -311,6 +469,10 @@
                             '<div class="result-section">' +
                             '<h2>Chinese Translation:</h2>' +
                             '<p>' + response.translation + '</p>' +
+                            '</div>' +
+                            '<div class="result-section">' +
+                            '<h2>Generation Time:</h2>' +
+                            '<p>' + response.generation_time.toFixed(2) + ' seconds</p>' +
                             '</div>'
                         ).show();
                         loadHistory();
@@ -321,6 +483,108 @@
                     }
                 });
             });
+
+            // carame
+
+            function getLocationAndCapture() {
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+                        captureImageWithLocation(latitude, longitude);
+                    }, function(error) {
+                        console.error("Error getting location: ", error);
+                        captureImageWithLocation(null, null);
+                    });
+                } else {
+                    console.log("Geolocation is not available");
+                    captureImageWithLocation(null, null);
+                }
+            }
+
+            function captureImageWithLocation(latitude, longitude) {
+                const imageData = captureImage();
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                let filename = `camera_capture_${timestamp}`;
+
+                if (latitude !== null && longitude !== null) {
+                    filename += `_${latitude.toFixed(6)}_${longitude.toFixed(6)}`;
+                }
+
+                filename += '.jpg';
+
+                processImage(imageData, filename);
+            }
+
+
+             function processImage(imageData,filename) {
+                const formData = new FormData($('#upload-form')[0]);
+                formData.set('prompt', '描述一图片里的内容，详细分析一下。.');
+                formData.set('model', 'minicpm');
+                formData.set('file', dataURItoBlob(imageData), filename);
+                $.ajax({
+                    url: '/process_image',
+                    type: 'POST',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function(response) {
+                        $('#result').html(
+                            '<div class="result-section">' +
+                            '<h2>Model: ' + response.model_type + '</h2>' +
+                            '<h2>English Description:</h2>' +
+                            '<p>' + response.description + '</p>' +
+                            '</div>' +
+                            '<div class="result-section">' +
+                            '<h2>Chinese Translation:</h2>' +
+                            '<p>' + response.translation + '</p>' +
+                            '</div>' +
+                            '<div class="result-section">' +
+                            '<h2>Generation Time:</h2>' +
+                            '<p>' + response.generation_time.toFixed(2) + ' seconds</p>' +
+                            '</div>'
+                        ).show();
+                        loadHistory();
+                    },
+                    error: function() {
+                        $('#result').html('<p>An error occurred. Please try again.</p>').show();
+                    }
+                });
+            }
+
+            function dataURItoBlob(dataURI) {
+                const byteString = atob(dataURI.split(',')[1]);
+                const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                }
+                return new Blob([ab], {type: mimeString});
+            }
+
+
+
+            $('#start-camera').click(startCamera);
+            $('#stop-camera').click(stopCamera);
+
+            // 修改开始间隔捕获的代码
+            $('#start-interval').click(function() {
+                const interval = $('#interval-input').val() * 1000; // Convert to milliseconds
+                intervalId = setInterval(getLocationAndCapture, interval);
+                $(this).hide();
+                $('#stop-interval').show();
+            });
+
+            // 修改单次捕获的代码（如果有的话）
+            $('#capture-button').click(getLocationAndCapture);
+
+            $('#stop-interval').click(function() {
+                clearInterval(intervalId);
+                $(this).hide();
+                $('#start-interval').show();
+            });
+
         });
     </script>
 </body>
